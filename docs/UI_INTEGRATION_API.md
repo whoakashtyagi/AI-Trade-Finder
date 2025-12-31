@@ -182,17 +182,29 @@ Base path: `/api/v2/schedulers`
 - `GET    /api/v2/schedulers/statistics`
 - `GET    /api/v2/schedulers/active`
 
-### 4.3 API v1 (Trade Finder)
+### 4.3 API v2 (Operations / UI Integration)
+Base paths: `/api/v2/operations`, `/api/v2/ui`
+
+- `GET /api/v2/operations/logs`
+- `GET /api/v2/operations/{operationId}`
+- `GET /api/v2/operations/logs/{id}`
+- `GET /api/v2/ui/constants`
+
+### 4.4 API v1 (Trade Finder)
 Base path: `/api/v1/trade-finder`
 
 - `POST /api/v1/trade-finder/trigger`
 - `GET  /api/v1/trade-finder/trades/{symbol}`
 - `GET  /api/v1/trade-finder/trades/{symbol}/status/{status}`
 - `GET  /api/v1/trade-finder/trades/recent?hours=24`
+- `GET  /api/v1/trade-finder/trades?symbol=&status=&direction=&minConfidence=&hours=24&limit=200` *(UI-friendly list)*
+- `GET  /api/v1/trade-finder/trades/id/{tradeId}` *(get by id)*
+- `PATCH /api/v1/trade-finder/trades/id/{tradeId}/status` *(update status)*
+- `GET  /api/v1/trade-finder/summary?hours=24` *(dashboard summary)*
 - `GET  /api/v1/trade-finder/statistics?hours=24`
 - `GET  /api/v1/trade-finder/health`
 
-### 4.4 API v1 (Market Events)
+### 4.5 API v1 (Market Events)
 Base path: `/api/v1/market-events`
 
 - `POST   /api/v1/market-events`
@@ -204,7 +216,7 @@ Base path: `/api/v1/market-events`
 - `DELETE /api/v1/market-events/{id}`
 - `GET    /api/v1/market-events/health`
 
-### 4.5 API v1 (AI Conversation State)
+### 4.6 API v1 (AI Conversation State)
 Base path: `/api/v1/conversations`
 
 - `POST /api/v1/conversations`
@@ -213,6 +225,33 @@ Base path: `/api/v1/conversations`
 - `GET  /api/v1/conversations/symbol/{symbol}`
 - `POST /api/v1/conversations/{conversationId}/complete`
 - `POST /api/v1/conversations/cleanup`
+
+### 4.7 API v1 (OHLC Data)
+Base path: `/api/v1/ohlc`
+
+- `POST   /api/v1/ohlc`
+- `GET    /api/v1/ohlc`
+- `GET    /api/v1/ohlc/{id}`
+- `GET    /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}?start=...&end=...`
+- `GET    /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}/epoch?startMillis=...&endMillis=...`
+- `GET    /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}/latest`
+- `PUT    /api/v1/ohlc/{id}`
+- `DELETE /api/v1/ohlc/{id}`
+- `GET    /api/v1/ohlc/health`
+
+### 4.8 API v1 (Transformed Events)
+Base path: `/api/v1/transformed-events`
+
+- `POST   /api/v1/transformed-events`
+- `GET    /api/v1/transformed-events`
+- `GET    /api/v1/transformed-events/{id}`
+- `GET    /api/v1/transformed-events/symbol/{symbol}?start=...&end=...`
+- `GET    /api/v1/transformed-events/symbol/{symbol}/timeframe/{timeframe}?start=...&end=...`
+- `GET    /api/v1/transformed-events/uec/{uniqueEventCode}?start=...&end=...`
+- `GET    /api/v1/transformed-events/trade-signals/symbol/{symbol}/timeframe/{timeframe}?start=...&end=...`
+- `PUT    /api/v1/transformed-events/{id}`
+- `DELETE /api/v1/transformed-events/{id}`
+- `GET    /api/v1/transformed-events/health`
 
 ---
 
@@ -618,9 +657,12 @@ Manually runs the trade finder process.
   "status": "success",
   "message": "Trade finder execution completed",
   "timestamp": "2025-12-31T10:00:00Z",
-  "data": {"duration_ms": 1234}
+  "data": {"duration_ms": 1234, "operationId": "5a2d1b4b-0d4a-4c2a-b7d0-1f4f0c9d6c2f"}
 }
 ```
+
+UI notes:
+- `operationId` can be used to fetch operation logs via `GET /api/v2/operations/{operationId}` or `GET /api/v2/operations/logs?operationId=...`.
 
 ---
 
@@ -954,6 +996,265 @@ Response:
 
 ---
 
+## 10A) API v1 — OHLC Data Management
+
+Base path: `/api/v1/ohlc`
+
+**Purpose**: This controller manages OHLC (Open, High, Low, Close) candlestick data for market analysis. It provides endpoints for storing, retrieving, and managing candlestick data across different symbols and timeframes.
+
+**Related documents**: `OHLCData` (MongoDB document)
+
+### 10A.1 `OHLCData` Structure
+```json
+{
+  "id": "mongo-id",
+  "symbol": "NQ",
+  "timeframe": "15m",
+  "timestamp": "2025-12-31T10:00:00Z",
+  "epochMillis": 1735639200000,
+  "open": 19500.50,
+  "high": 19520.75,
+  "low": 19495.25,
+  "close": 19515.00,
+  "volume": 12345
+}
+```
+
+---
+
+### 10A.2 `POST /api/v1/ohlc`
+Creates a new OHLC data record.
+
+**Request body**: `OHLCData`
+
+**Response**: `OHLCData` (201 Created)
+
+---
+
+### 10A.3 `GET /api/v1/ohlc`
+Returns all OHLC records (use with caution on large datasets).
+
+**Response**: `OHLCData[]` (200 OK)
+
+---
+
+### 10A.4 `GET /api/v1/ohlc/{id}`
+Returns a specific OHLC record by MongoDB `_id`.
+
+**Response**: `OHLCData` (200 OK) or 404 Not Found
+
+---
+
+### 10A.5 `GET /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}`
+Returns OHLC data for a specific symbol and timeframe within a date range.
+
+**Query parameters**:
+- `start`: ISO-8601 timestamp (required)
+- `end`: ISO-8601 timestamp (required)
+
+**Example**: `GET /api/v1/ohlc/symbol/NQ/timeframe/15m?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z`
+
+**Response**: `OHLCData[]` ordered by timestamp ascending
+
+---
+
+### 10A.6 `GET /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}/epoch`
+Returns OHLC data using epoch milliseconds for the time range (alternative to ISO-8601).
+
+**Query parameters**:
+- `startMillis`: epoch milliseconds (required)
+- `endMillis`: epoch milliseconds (required)
+
+**Example**: `GET /api/v1/ohlc/symbol/NQ/timeframe/15m/epoch?startMillis=1735689600000&endMillis=1735775999000`
+
+**Response**: `OHLCData[]` ordered by epochMillis ascending
+
+---
+
+### 10A.7 `GET /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}/latest`
+Returns the most recent OHLC record for a symbol and timeframe.
+
+**Example**: `GET /api/v1/ohlc/symbol/NQ/timeframe/15m/latest`
+
+**Response**: `OHLCData` (200 OK) or 404 Not Found
+
+---
+
+### 10A.8 `PUT /api/v1/ohlc/{id}`
+Updates an existing OHLC record.
+
+**Request body**: `OHLCData` (id field will be overridden by path parameter)
+
+**Response**: `OHLCData` (200 OK) or 404 Not Found
+
+---
+
+### 10A.9 `DELETE /api/v1/ohlc/{id}`
+Deletes an OHLC record by id.
+
+**Response**: 204 No Content or 404 Not Found
+
+---
+
+### 10A.10 `GET /api/v1/ohlc/health`
+Health check endpoint for OHLC service.
+
+**Response**:
+```json
+{
+  "status": "UP",
+  "service": "OHLCService",
+  "totalRecords": 15234,
+  "timestamp": "2025-12-31T10:00:00Z"
+}
+```
+
+**Status codes**:
+- `200 OK` - Service is healthy
+- `503 Service Unavailable` - Service is down (with error details)
+
+---
+
+## 10B) API v1 — Transformed Events Management
+
+Base path: `/api/v1/transformed-events`
+
+**Purpose**: This controller manages transformed market events that have been processed and enriched from raw market events. These events represent analyzed market conditions, patterns, and potential trade signals.
+
+**Related documents**: `TransformedEvent` (MongoDB document)
+
+### 10B.1 `TransformedEvent` Structure
+```json
+{
+  "id": "mongo-id",
+  "symbol": "NQ",
+  "timeframe": "15m",
+  "uniqueEventCode": "NQ_15m_FVG_CE_20251231100000",
+  "eventTs": "2025-12-31T10:00:00Z",
+  "isTradeSignal": true,
+  "eventType": "FVG_CE",
+  "price": 19515.00,
+  "confidence": 0.85,
+  "metadata": {
+    "pattern": "Fair Value Gap",
+    "direction": "BULLISH",
+    "additionalData": {}
+  }
+}
+```
+
+---
+
+### 10B.2 `POST /api/v1/transformed-events`
+Creates a new transformed event record.
+
+**Request body**: `TransformedEvent`
+
+**Response**: `TransformedEvent` (201 Created)
+
+---
+
+### 10B.3 `GET /api/v1/transformed-events`
+Returns all transformed events (use with caution on large datasets).
+
+**Response**: `TransformedEvent[]` (200 OK)
+
+---
+
+### 10B.4 `GET /api/v1/transformed-events/{id}`
+Returns a specific transformed event by MongoDB `_id`.
+
+**Response**: `TransformedEvent` (200 OK) or 404 Not Found
+
+---
+
+### 10B.5 `GET /api/v1/transformed-events/symbol/{symbol}`
+Returns transformed events for a specific symbol within a date range.
+
+**Query parameters**:
+- `start`: ISO-8601 timestamp (required)
+- `end`: ISO-8601 timestamp (required)
+
+**Example**: `GET /api/v1/transformed-events/symbol/NQ?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z`
+
+**Response**: `TransformedEvent[]` ordered by eventTs descending
+
+---
+
+### 10B.6 `GET /api/v1/transformed-events/symbol/{symbol}/timeframe/{timeframe}`
+Returns transformed events for a specific symbol and timeframe within a date range.
+
+**Query parameters**:
+- `start`: ISO-8601 timestamp (required)
+- `end`: ISO-8601 timestamp (required)
+
+**Example**: `GET /api/v1/transformed-events/symbol/NQ/timeframe/15m?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z`
+
+**Response**: `TransformedEvent[]` ordered by eventTs descending
+
+---
+
+### 10B.7 `GET /api/v1/transformed-events/uec/{uniqueEventCode}`
+Returns transformed events matching a specific unique event code within a date range.
+
+**Query parameters**:
+- `start`: ISO-8601 timestamp (required)
+- `end`: ISO-8601 timestamp (required)
+
+**Example**: `GET /api/v1/transformed-events/uec/NQ_15m_FVG_CE_20251231100000?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z`
+
+**Response**: `TransformedEvent[]` ordered by eventTs descending
+
+---
+
+### 10B.8 `GET /api/v1/transformed-events/trade-signals/symbol/{symbol}/timeframe/{timeframe}`
+Returns only events marked as trade signals for a specific symbol and timeframe.
+
+**Query parameters**:
+- `start`: ISO-8601 timestamp (required)
+- `end`: ISO-8601 timestamp (required)
+
+**Example**: `GET /api/v1/transformed-events/trade-signals/symbol/NQ/timeframe/15m?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z`
+
+**Response**: `TransformedEvent[]` where `isTradeSignal=true`, ordered by eventTs descending
+
+---
+
+### 10B.9 `PUT /api/v1/transformed-events/{id}`
+Updates an existing transformed event record.
+
+**Request body**: `TransformedEvent` (id field will be overridden by path parameter)
+
+**Response**: `TransformedEvent` (200 OK) or 404 Not Found
+
+---
+
+### 10B.10 `DELETE /api/v1/transformed-events/{id}`
+Deletes a transformed event by id.
+
+**Response**: 204 No Content or 404 Not Found
+
+---
+
+### 10B.11 `GET /api/v1/transformed-events/health`
+Health check endpoint for Transformed Events service.
+
+**Response**:
+```json
+{
+  "status": "UP",
+  "service": "TransformedEventService",
+  "totalEvents": 8567,
+  "timestamp": "2025-12-31T10:00:00Z"
+}
+```
+
+**Status codes**:
+- `200 OK` - Service is healthy
+- `503 Service Unavailable` - Service is down (with error details)
+
+---
+
 ## 11) UI Integration Checklist (Practical)
 
 - Use ISO-8601 timestamps (UTC) for `Instant` query params (`start`, `end`) and display.
@@ -971,12 +1272,85 @@ This doc is generated from these code locations:
 - Controllers:
   - `com.trade.app.controller.UnifiedAIController`
   - `com.trade.app.controller.SchedulerConfigController`
+  - `com.trade.app.controller.OperationLogController`
   - `com.trade.app.controller.TradeFinderController`
+  - `com.trade.app.controller.UiMetadataController`
   - `com.trade.app.controller.CoreMarketEventController`
   - `com.trade.app.controller.AIConversationController`
+  - `com.trade.app.controller.OHLCDataController`
+  - `com.trade.app.controller.TransformedEventController`
 - DTOs/Documents:
   - `com.trade.app.domain.dto.*`
   - `com.trade.app.persistence.mongo.document.*`
   - `com.trade.app.openai.dto.*`
 - Constants:
   - `com.trade.app.util.Constants`
+
+---
+
+## 13) API v2 — Operation Logs (UI)
+
+Base path: `/api/v2/operations`
+
+### 13.1 `GET /api/v2/operations/logs`
+Query operation logs to show execution history in the UI.
+
+Common query params:
+- `operationId`: correlation id (UUID string). If provided, returns all records for that operation.
+- `operationType`: e.g. `SCHEDULER_EXECUTION`, `TRADE_FINDER_RUN`, `TRADE_FINDER_TRIGGER`, `AI_ANALYZE`, `AI_ANALYZE_TRADE`, `TRADE_STATUS_UPDATE`
+- `status`: `IN_PROGRESS | SUCCESS | FAILED`
+- `source`: e.g. `SCHEDULER | MANUAL | API`
+- `from`, `to`: ISO-8601 timestamps
+- `limit`: default `200`, max `1000`
+
+**Response**: `OperationLog[]`
+```json
+[
+  {
+    "id": "mongo-id",
+    "operationId": "uuid",
+    "operationType": "SCHEDULER_EXECUTION",
+    "source": "SCHEDULER",
+    "status": "SUCCESS",
+    "title": "Scheduler execution: trade-finder-nq",
+    "message": "Scheduler execution completed",
+    "error": null,
+    "startedAt": "2025-12-31T10:00:00Z",
+    "endedAt": "2025-12-31T10:00:02Z",
+    "durationMs": 2100,
+    "metadata": {"schedulerName": "trade-finder-nq"},
+    "events": [
+      {"timestamp": "2025-12-31T10:00:00Z", "level": "INFO", "message": "Scheduler execution started", "data": {"schedulerName": "trade-finder-nq"}}
+    ]
+  }
+]
+```
+
+### 13.2 `GET /api/v2/operations/{operationId}`
+Returns the latest `OperationLog` record for a correlation id.
+
+### 13.3 `GET /api/v2/operations/logs/{id}`
+Returns a specific log record by Mongo `_id`.
+
+---
+
+## 14) API v2 — UI Constants
+
+Base path: `/api/v2/ui`
+
+### 15.1 `GET /api/v2/ui/constants`
+Returns allowed values (from backend constants) for dropdowns.
+
+Example response:
+```json
+{
+  "tradeStatuses": ["IDENTIFIED", "ALERTED", "EXPIRED", "CANCELLED", "TAKEN", "INVALIDATED"],
+  "tradeDirections": ["LONG", "SHORT"],
+  "tradeSignalStatuses": ["TRADE_IDENTIFIED", "NO_SETUP", "INSUFFICIENT_DATA", "ERROR"],
+  "entryZoneTypes": ["FVG_CE", "IFVG", "OB", "BREAKER", "MITIGATION"],
+  "alertTypes": ["CALL_SMS_TELEGRAM", "SMS_TELEGRAM", "LOG_ONLY"],
+  "conversationStatuses": ["ACTIVE", "COMPLETED", "EXPIRED"],
+  "conversationTypes": ["TRADE_FOLLOWUP", "TRADE_ANALYSIS", "MARKET_ANALYSIS", "WORKFLOW"],
+  "conversationEntityTypes": ["TRADE", "SYMBOL", "PATTERN"]
+}
+```

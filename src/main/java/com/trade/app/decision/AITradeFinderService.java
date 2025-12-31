@@ -10,6 +10,7 @@ import com.trade.app.openai.exception.AIClientException;
 import com.trade.app.persistence.mongo.document.IdentifiedTrade;
 import com.trade.app.persistence.mongo.document.TransformedEvent;
 import com.trade.app.persistence.mongo.document.OHLCData;
+import com.trade.app.persistence.mongo.document.CoreMarketEvent;
 import com.trade.app.persistence.mongo.repository.IdentifiedTradeRepository;
 import com.trade.app.persistence.mongo.repository.TransformedEventRepository;
 import com.trade.app.persistence.mongo.repository.OHLCRepository;
@@ -56,6 +57,7 @@ public class AITradeFinderService {
     private final TransformedEventRepository transformedEventRepository;
     private final IdentifiedTradeRepository identifiedTradeRepository;
     private final OHLCRepository ohlcRepository;
+    private final com.trade.app.persistence.mongo.repository.CoreMarketEventRepository coreMarketEventRepository;
     private final AIClientService aiClientService;
     private final ObjectMapper objectMapper;
     private final com.trade.app.util.PromptLoader promptLoader;
@@ -184,17 +186,37 @@ public class AITradeFinderService {
         Instant now = Instant.now();
         Instant eventCutoff = now.minus(eventLookbackMinutes, ChronoUnit.MINUTES);
 
-        log.debug("Building payload for {}: looking back {} minutes", symbol, eventLookbackMinutes);
+        log.info("Building payload for {}: looking back {} minutes from {} to {}", 
+            symbol, eventLookbackMinutes, eventCutoff, now);
 
         // Query transformed events
         List<TransformedEvent> events = transformedEventRepository
             .findBySymbolAndEventTsAfterOrderByEventTsDesc(symbol, eventCutoff);
 
-        log.debug("Found {} transformed events for {}", events.size(), symbol);
+        log.info("Found {} transformed events for {} between {} and {}", 
+            events.size(), symbol, eventCutoff, now);
+        
+        // Log latest event timestamp in database for debugging
+        if (events.isEmpty()) {
+            log.warn("No events found for {} in lookback window. Check if there are ANY events for this symbol in the database.", symbol);
+        } else {
+            log.debug("Latest event timestamp: {}", events.get(0).getEventTs());
+        }
 
         // Build event stream
         List<TradeFinderPayloadDTO.EventInfo> eventStream = events.stream()
             .map(this::mapEventToEventInfo)
+            .collect(Collectors.toList());
+
+        // Query core market events
+        List<CoreMarketEvent> coreEvents = coreMarketEventRepository
+            .findBySymbolAndIngestedTsBetweenOrderByIngestedTsDesc(symbol, eventCutoff, now);
+
+        log.debug("Found {} core market events for {}", coreEvents.size(), symbol);
+
+        // Build core event stream
+        List<TradeFinderPayloadDTO.CoreEventInfo> coreEventStream = coreEvents.stream()
+            .map(this::mapCoreEventToCoreEventInfo)
             .collect(Collectors.toList());
 
         // Build OHLC context for multiple timeframes
@@ -215,6 +237,7 @@ public class AITradeFinderService {
             .analysisProfile(analysisProfile)
             .task("Analyze recent market events and identify high-confluence trade setup with entry, stop, and targets.")
             .eventStream(eventStream)
+            .coreEvents(coreEventStream)
             .ohlcContext(ohlcContext)
             .build();
     }
@@ -443,6 +466,24 @@ public class AITradeFinderService {
             .actionCode(event.getActionCode())
             .uec(event.getUniqueEventCode())
             .isTriggerReasoner(event.isTriggerReasoner())
+            .build();
+    }
+
+    /**
+     * Maps CoreMarketEvent to CoreEventInfo DTO.
+     *
+     * @param event The core market event
+     * @return CoreEventInfo DTO
+     */
+    private TradeFinderPayloadDTO.CoreEventInfo mapCoreEventToCoreEventInfo(CoreMarketEvent event) {
+        return TradeFinderPayloadDTO.CoreEventInfo.builder()
+            .ts(ISO_FORMATTER.format(event.getIngestedTs()))
+            .indicatorName(event.getIndicatorName())
+            .timeframe(event.getTimeframe())
+            .rawMessage(event.getRawMessage())
+            .ingestedTs(ISO_FORMATTER.format(event.getIngestedTs()))
+            .queued(event.isQueued())
+            .transformAttempts(event.getTransformAttempts())
             .build();
     }
 

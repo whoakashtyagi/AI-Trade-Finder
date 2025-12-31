@@ -15,8 +15,12 @@ servers:
 tags:
   - name: AI v2
   - name: Schedulers v2
+  - name: Operations v2
+  - name: UI v2
   - name: Trade Finder v1
   - name: Market Events v1
+  - name: Transformed Events v1
+  - name: OHLC v1
   - name: Conversations v1
 paths:
   /api/v2/ai/analyze/trade:
@@ -398,6 +402,210 @@ paths:
                 additionalProperties:
                   type: boolean
 
+  /api/v2/operations/logs:
+    get:
+      tags: [Operations v2]
+      summary: Query operation logs (UI)
+      parameters:
+        - in: query
+          name: operationId
+          required: false
+          schema: { type: string }
+        - in: query
+          name: operationType
+          required: false
+          schema: { type: string }
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [IN_PROGRESS, SUCCESS, FAILED]
+        - in: query
+          name: source
+          required: false
+          schema: { type: string }
+        - in: query
+          name: from
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, format: int32, default: 200, minimum: 1, maximum: 1000 }
+      responses:
+        '200':
+          description: Operation logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationLog'
+
+  /api/v2/operations/{operationId}:
+    get:
+      tags: [Operations v2]
+      summary: Get latest operation log by operationId
+      parameters:
+        - in: path
+          name: operationId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Latest operation log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationLog'
+        '404':
+          description: Not found
+
+  /api/v2/operations/logs/{id}:
+    get:
+      tags: [Operations v2]
+      summary: Get operation log by Mongo id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Operation log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationLog'
+        '404':
+          description: Not found
+
+  /api/v1/trade-finder/trades:
+    get:
+      tags: [Trade Finder v1]
+      summary: List trades (UI-friendly filters)
+      parameters:
+        - in: query
+          name: symbol
+          required: false
+          schema: { type: string }
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [IDENTIFIED, ALERTED, EXPIRED, CANCELLED, TAKEN, INVALIDATED]
+        - in: query
+          name: direction
+          required: false
+          schema:
+            type: string
+            enum: [LONG, SHORT]
+        - in: query
+          name: minConfidence
+          required: false
+          schema: { type: integer, format: int32, minimum: 0, maximum: 100 }
+        - in: query
+          name: hours
+          required: false
+          schema: { type: integer, format: int32, default: 24, minimum: 1, maximum: 168 }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, format: int32, default: 200, minimum: 1, maximum: 1000 }
+      responses:
+        '200':
+          description: Trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IdentifiedTrade'
+
+  /api/v1/trade-finder/trades/id/{tradeId}:
+    get:
+      tags: [Trade Finder v1]
+      summary: Get trade by id
+      parameters:
+        - in: path
+          name: tradeId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentifiedTrade'
+        '404':
+          description: Not found
+
+  /api/v1/trade-finder/trades/id/{tradeId}/status:
+    patch:
+      tags: [Trade Finder v1]
+      summary: Update trade status
+      parameters:
+        - in: path
+          name: tradeId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTradeStatusRequest'
+      responses:
+        '200':
+          description: Updated trade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentifiedTrade'
+        '400':
+          description: Validation error (often empty body)
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/trade-finder/summary:
+    get:
+      tags: [Trade Finder v1]
+      summary: Trade dashboard summary
+      parameters:
+        - in: query
+          name: hours
+          required: false
+          schema: { type: integer, format: int32, default: 24, minimum: 1, maximum: 168 }
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v2/ui/constants:
+    get:
+      tags: [UI v2]
+      summary: UI constants (dropdowns)
+      responses:
+        '200':
+          description: UI constants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiConstantsResponse'
+
   /api/v1/trade-finder/trigger:
     post:
       tags: [Trade Finder v1]
@@ -680,6 +888,475 @@ paths:
     get:
       tags: [Market Events v1]
       summary: Market events health check
+      responses:
+        '200':
+          description: UP
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '503':
+          description: DOWN
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/transformed-events:
+    post:
+      tags: [Transformed Events v1]
+      summary: Create transformed event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransformedEvent'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransformedEvent'
+        '500':
+          description: Internal error (often empty body)
+    get:
+      tags: [Transformed Events v1]
+      summary: List all transformed events
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransformedEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/transformed-events/{id}:
+    get:
+      tags: [Transformed Events v1]
+      summary: Get transformed event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransformedEvent'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+    put:
+      tags: [Transformed Events v1]
+      summary: Update transformed event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransformedEvent'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransformedEvent'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+    delete:
+      tags: [Transformed Events v1]
+      summary: Delete transformed event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/transformed-events/symbol/{symbol}:
+    get:
+      tags: [Transformed Events v1]
+      summary: Query transformed events by symbol and time range
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransformedEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/transformed-events/symbol/{symbol}/timeframe/{timeframe}:
+    get:
+      tags: [Transformed Events v1]
+      summary: Query transformed events by symbol, timeframe, and time range
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: timeframe
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransformedEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/transformed-events/uec/{uniqueEventCode}:
+    get:
+      tags: [Transformed Events v1]
+      summary: Query transformed events by unique event code and time range
+      parameters:
+        - in: path
+          name: uniqueEventCode
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransformedEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/transformed-events/trade-signals/symbol/{symbol}/timeframe/{timeframe}:
+    get:
+      tags: [Transformed Events v1]
+      summary: Query transformed trade-signal events by symbol, timeframe, and time range
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: timeframe
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransformedEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/transformed-events/health:
+    get:
+      tags: [Transformed Events v1]
+      summary: Transformed events health check
+      responses:
+        '200':
+          description: UP
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '503':
+          description: DOWN
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/ohlc:
+    post:
+      tags: [OHLC v1]
+      summary: Create OHLC record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OHLCData'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OHLCData'
+        '500':
+          description: Internal error (often empty body)
+    get:
+      tags: [OHLC v1]
+      summary: List all OHLC records
+      responses:
+        '200':
+          description: OHLC rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OHLCData'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/ohlc/{id}:
+    get:
+      tags: [OHLC v1]
+      summary: Get OHLC by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OHLC row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OHLCData'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+    put:
+      tags: [OHLC v1]
+      summary: Update OHLC by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OHLCData'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OHLCData'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+    delete:
+      tags: [OHLC v1]
+      summary: Delete OHLC by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}:
+    get:
+      tags: [OHLC v1]
+      summary: Query OHLC by symbol, timeframe, and time range (ISO timestamps)
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: timeframe
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: OHLC rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OHLCData'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}/epoch:
+    get:
+      tags: [OHLC v1]
+      summary: Query OHLC by symbol, timeframe, and time range (epoch millis)
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: timeframe
+          required: true
+          schema: { type: string }
+        - in: query
+          name: startMillis
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: endMillis
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OHLC rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OHLCData'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/ohlc/symbol/{symbol}/timeframe/{timeframe}/latest:
+    get:
+      tags: [OHLC v1]
+      summary: Get latest OHLC record for symbol and timeframe
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: timeframe
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Latest OHLC row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OHLCData'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/ohlc/health:
+    get:
+      tags: [OHLC v1]
+      summary: OHLC health check
       responses:
         '200':
           description: UP
@@ -1077,6 +1754,98 @@ components:
           type: object
           additionalProperties: { type: boolean }
 
+    OperationEvent:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        level: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    OperationLog:
+      type: object
+      properties:
+        id: { type: string, nullable: true }
+        operationId: { type: string }
+        operationType: { type: string }
+        source: { type: string }
+        status:
+          type: string
+          enum: [IN_PROGRESS, SUCCESS, FAILED]
+        title: { type: string, nullable: true }
+        message: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+        stackTrace: { type: string, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        endedAt: { type: string, format: date-time, nullable: true }
+        durationMs: { type: integer, format: int64, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationEvent'
+          nullable: true
+        createdAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    UpdateTradeStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [IDENTIFIED, ALERTED, EXPIRED, CANCELLED, TAKEN, INVALIDATED]
+        alertSent: { type: boolean, nullable: true }
+        alertType:
+          type: string
+          nullable: true
+          enum: [CALL_SMS_TELEGRAM, SMS_TELEGRAM, LOG_ONLY]
+
+    TradeSummaryResponse:
+      type: object
+      properties:
+        hours: { type: integer, format: int32 }
+        total: { type: integer, format: int32 }
+        byStatus:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+        knownStatuses:
+          type: array
+          items: { type: string }
+
+    UiConstantsResponse:
+      type: object
+      properties:
+        tradeStatuses:
+          type: array
+          items: { type: string }
+        tradeDirections:
+          type: array
+          items: { type: string }
+        tradeSignalStatuses:
+          type: array
+          items: { type: string }
+        entryZoneTypes:
+          type: array
+          items: { type: string }
+        alertTypes:
+          type: array
+          items: { type: string }
+        conversationStatuses:
+          type: array
+          items: { type: string }
+        conversationTypes:
+          type: array
+          items: { type: string }
+        conversationEntityTypes:
+          type: array
+          items: { type: string }
+
     IdentifiedTrade:
       type: object
       properties:
@@ -1142,6 +1911,56 @@ components:
           additionalProperties: true
         queued: { type: boolean }
         transformAttempts: { type: integer, format: int32 }
+
+    TransformedEvent:
+      type: object
+      properties:
+        id: { type: string, nullable: true }
+        symbol: { type: string, nullable: true }
+        uniqueEventCode: { type: string, nullable: true }
+        timeframe: { type: string, nullable: true }
+        eventTs: { type: string, format: date-time, nullable: true }
+        sourceEventId: { type: string, nullable: true }
+        rawEvent: { type: string, nullable: true }
+        indicatorShortCode: { type: string, nullable: true }
+        directionCode: { type: string, nullable: true }
+        actionCode: { type: string, nullable: true }
+        featureMaskBase36: { type: string, nullable: true }
+        featureMaskValue: { type: integer, format: int64, nullable: true }
+        extras:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        uecDescription: { type: string, nullable: true }
+        createdTs: { type: string, format: date-time, nullable: true }
+        isTextNotify: { type: boolean }
+        isCallNotify: { type: boolean }
+        isAlexaAnnounce: { type: boolean }
+        isTradeSignal: { type: boolean }
+        isTriggerReasoner: { type: boolean }
+        announceMsg: { type: string, nullable: true }
+        txtNotifyMsg: { type: string, nullable: true }
+        callNotifyMsg: { type: string, nullable: true }
+        approxPriceAtEvent: { type: number, format: double, nullable: true }
+
+    OHLCData:
+      type: object
+      properties:
+        id: { type: string, nullable: true }
+        symbol: { type: string, nullable: true }
+        timeframe: { type: string, nullable: true }
+        epochMillis: { type: integer, format: int64, nullable: true }
+        timestamp: { type: string, format: date-time, nullable: true }
+        open: { type: number, format: double, nullable: true }
+        high: { type: number, format: double, nullable: true }
+        low: { type: number, format: double, nullable: true }
+        close: { type: number, format: double, nullable: true }
+        volume: { type: integer, format: int64, nullable: true }
+        source: { type: string, nullable: true }
+        rtype: { type: integer, format: int32, nullable: true }
+        publisherId: { type: integer, format: int32, nullable: true }
+        instrumentId: { type: integer, format: int64, nullable: true }
 
     CreateConversationRequest:
       type: object

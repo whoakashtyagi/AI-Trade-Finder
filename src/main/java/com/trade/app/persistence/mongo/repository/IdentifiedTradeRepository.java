@@ -5,6 +5,9 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -51,6 +54,8 @@ public interface IdentifiedTradeRepository extends MongoRepository<IdentifiedTra
      */
     List<IdentifiedTrade> findByIdentifiedAtAfterOrderByIdentifiedAtDesc(Instant cutoff);
 
+    Page<IdentifiedTrade> findByIdentifiedAtAfterOrderByIdentifiedAtDesc(Instant cutoff, Pageable pageable);
+
     /**
      * Finds expired trades that are still marked as IDENTIFIED.
      * These trades should have their status updated to EXPIRED.
@@ -68,6 +73,15 @@ public interface IdentifiedTradeRepository extends MongoRepository<IdentifiedTra
      * @return List of all identified trades for the symbol
      */
     List<IdentifiedTrade> findBySymbolOrderByIdentifiedAtDesc(String symbol);
+
+    Page<IdentifiedTrade> findBySymbolOrderByIdentifiedAtDesc(String symbol, Pageable pageable);
+
+    Page<IdentifiedTrade> findBySymbolAndStatusOrderByIdentifiedAtDesc(String symbol, String status, Pageable pageable);
+
+    Page<IdentifiedTrade> findByStatusOrderByIdentifiedAtDesc(String status, Pageable pageable);
+
+    @Query("{'confidence': {$gte: ?0}}")
+    Page<IdentifiedTrade> findByConfidenceGreaterThanEqual(Integer minConfidence, Pageable pageable);
 
     /**
      * Finds identified trades by symbol and direction.

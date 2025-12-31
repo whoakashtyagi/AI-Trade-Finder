@@ -50,6 +50,12 @@ public class TradeFinderPayloadDTO {
     private List<EventInfo> eventStream;
 
     /**
+     * Core market events (raw events from indicators).
+     */
+    @JsonProperty("core_events")
+    private List<CoreEventInfo> coreEvents;
+
+    /**
      * OHLC candle context for price action analysis.
      */
     @JsonProperty("ohlc_context")
@@ -134,6 +140,33 @@ public class TradeFinderPayloadDTO {
 
         @JsonProperty("is_trigger_reasoner")
         private Boolean isTriggerReasoner;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CoreEventInfo {
+        @JsonProperty("ts")
+        private String ts;
+
+        @JsonProperty("indicator_name")
+        private String indicatorName;
+
+        @JsonProperty("tf")
+        private String timeframe;
+
+        @JsonProperty("raw_message")
+        private String rawMessage;
+
+        @JsonProperty("ingested_ts")
+        private String ingestedTs;
+
+        @JsonProperty("queued")
+        private Boolean queued;
+
+        @JsonProperty("transform_attempts")
+        private Integer transformAttempts;
     }
 
     @Data

@@ -8,10 +8,14 @@ import com.trade.app.persistence.mongo.document.IdentifiedTrade;
 import com.trade.app.persistence.mongo.repository.IdentifiedTradeRepository;
 import com.trade.app.service.OperationLogService;
 import com.trade.app.util.OperationLogContext;
+import com.trade.app.util.Constants;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +24,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -86,6 +91,155 @@ public class TradeFinderController {
     }
 
     /**
+     * UI-friendly list endpoint with optional filters.
+     *
+     * GET /api/v1/trade-finder/trades?symbol=&status=&direction=&minConfidence=&hours=24&limit=200
+     */
+    @GetMapping("/trades")
+    public ResponseEntity<List<IdentifiedTrade>> listTrades(
+        @RequestParam(required = false) String symbol,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String direction,
+        @RequestParam(required = false) Integer minConfidence,
+        @RequestParam(defaultValue = "24") @Min(1) @Max(168) int hours,
+        @RequestParam(defaultValue = "200") @Min(1) @Max(1000) int limit
+    ) {
+        Instant cutoff = Instant.now().minus(hours, ChronoUnit.HOURS);
+        PageRequest page = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "identifiedAt"));
+
+        if (symbol != null && !symbol.isBlank() && status != null && !status.isBlank()) {
+            return ResponseEntity.ok(
+                identifiedTradeRepository.findBySymbolAndStatusOrderByIdentifiedAtDesc(symbol, status, page).getContent()
+            );
+        }
+
+        List<IdentifiedTrade> base;
+        if (symbol != null && !symbol.isBlank()) {
+            base = identifiedTradeRepository.findBySymbolOrderByIdentifiedAtDesc(symbol, page).getContent();
+        } else if (status != null && !status.isBlank()) {
+            base = identifiedTradeRepository.findByStatusOrderByIdentifiedAtDesc(status, page).getContent();
+        } else if (minConfidence != null) {
+            base = identifiedTradeRepository.findByConfidenceGreaterThanEqual(minConfidence, page).getContent();
+        } else {
+            base = identifiedTradeRepository.findByIdentifiedAtAfterOrderByIdentifiedAtDesc(cutoff, page).getContent();
+        }
+
+        List<IdentifiedTrade> filtered = base.stream()
+            .filter(t -> t.getIdentifiedAt() == null || !t.getIdentifiedAt().isBefore(cutoff))
+            .filter(t -> direction == null || direction.isBlank() || direction.equalsIgnoreCase(t.getDirection()))
+            .filter(t -> minConfidence == null || (t.getConfidence() != null && t.getConfidence() >= minConfidence))
+            .toList();
+
+        return ResponseEntity.ok(filtered);
+    }
+
+    /**
+     * Get a trade by Mongo id without path ambiguity with /trades/{symbol}.
+     *
+     * GET /api/v1/trade-finder/trades/id/{tradeId}
+     */
+    @GetMapping("/trades/id/{tradeId}")
+    public ResponseEntity<IdentifiedTrade> getTradeById(@PathVariable String tradeId) {
+        return identifiedTradeRepository.findById(tradeId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Update trade status from the UI.
+     *
+     * PATCH /api/v1/trade-finder/trades/id/{tradeId}/status
+     */
+    @PatchMapping("/trades/id/{tradeId}/status")
+    public ResponseEntity<IdentifiedTrade> updateTradeStatus(
+        @PathVariable String tradeId,
+        @RequestBody UpdateTradeStatusRequest request
+    ) {
+        String operationId = operationLogService.startOrReuse(
+            "TRADE_STATUS_UPDATE",
+            "Update trade status: " + tradeId,
+            "API",
+            Map.of(
+                "endpoint", "/api/v1/trade-finder/trades/id/{tradeId}/status",
+                "tradeId", tradeId,
+                "newStatus", request != null ? request.getStatus() : null
+            )
+        );
+
+        try {
+            IdentifiedTrade trade = identifiedTradeRepository.findById(tradeId).orElse(null);
+            if (trade == null) {
+                operationLogService.completeFailure(operationId, "Trade not found", new RuntimeException("Trade not found"), null);
+                return ResponseEntity.notFound().build();
+            }
+
+            if (request == null || request.getStatus() == null || request.getStatus().isBlank()) {
+                operationLogService.completeFailure(operationId, "Missing status", new IllegalArgumentException("status is required"), null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            }
+
+            trade.setStatus(request.getStatus());
+            trade.setUpdatedAt(Instant.now());
+
+            if (request.getAlertSent() != null) {
+                trade.setAlertSent(request.getAlertSent());
+                trade.setAlertSentAt(request.getAlertSent() ? Instant.now() : null);
+            }
+
+            if (request.getAlertType() != null) {
+                trade.setAlertType(request.getAlertType());
+            }
+
+            IdentifiedTrade saved = identifiedTradeRepository.save(trade);
+            operationLogService.completeSuccess(operationId, "Trade status updated", Map.of(
+                "tradeId", saved.getId(),
+                "status", saved.getStatus()
+            ));
+
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            operationLogService.completeFailure(operationId, "Trade status update failed", e, null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            OperationLogContext.clear();
+        }
+    }
+
+    /**
+     * Trade summary for UI dashboards.
+     *
+     * GET /api/v1/trade-finder/summary?hours=24
+     */
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String, Object>> tradeSummary(
+        @RequestParam(defaultValue = "24") @Min(1) @Max(168) int hours
+    ) {
+        Instant cutoff = Instant.now().minus(hours, ChronoUnit.HOURS);
+        List<IdentifiedTrade> recent = identifiedTradeRepository.findByIdentifiedAtAfterOrderByIdentifiedAtDesc(cutoff);
+
+        Map<String, Long> byStatus = new LinkedHashMap<>();
+        for (IdentifiedTrade t : recent) {
+            String s = t.getStatus() != null ? t.getStatus() : "UNKNOWN";
+            byStatus.put(s, byStatus.getOrDefault(s, 0L) + 1);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("hours", hours);
+        response.put("total", recent.size());
+        response.put("byStatus", byStatus);
+        response.put("knownStatuses", List.of(
+            Constants.TradeStatus.IDENTIFIED,
+            Constants.TradeStatus.ALERTED,
+            Constants.TradeStatus.EXPIRED,
+            Constants.TradeStatus.CANCELLED,
+            Constants.TradeStatus.TAKEN,
+            Constants.TradeStatus.INVALIDATED
+        ));
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Retrieves all identified trades for a symbol.
      * 
      * @param symbol The trading symbol
@@ -99,6 +253,13 @@ public class TradeFinderController {
             .findBySymbolOrderByIdentifiedAtDesc(symbol);
 
         return ResponseEntity.ok(trades);
+    }
+
+    @lombok.Data
+    public static class UpdateTradeStatusRequest {
+        private String status;
+        private Boolean alertSent;
+        private String alertType;
     }
 
     /**
