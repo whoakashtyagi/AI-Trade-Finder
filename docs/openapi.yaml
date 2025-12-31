@@ -1,0 +1,1211 @@
+openapi: 3.0.3
+info:
+  title: AI Trade Finder API
+  version: "2.0"
+  description: |
+    OpenAPI specification for the AI Trade Finder project.
+
+    Notes:
+    - Authentication is not implemented (all endpoints are open).
+    - Some controllers return empty bodies on error (e.g., 500 with no JSON).
+    - Several fields are intentionally flexible objects (Map<String,Object>); those are modeled as `type: object` with `additionalProperties: true`.
+servers:
+  - url: http://localhost:8082
+    description: Local default
+tags:
+  - name: AI v2
+  - name: Schedulers v2
+  - name: Trade Finder v1
+  - name: Market Events v1
+  - name: Conversations v1
+paths:
+  /api/v2/ai/analyze/trade:
+    post:
+      tags: [AI v2]
+      summary: Structured trade analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTradeRequest'
+            examples:
+              basic:
+                value:
+                  symbol: NQ
+                  timeframe: 5m
+                  marketData:
+                    price: 21850
+                    volume: 150000
+                  indicators: [RSI, MACD, CISD]
+      responses:
+        '200':
+          description: Trade signal (structured)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeSignalResponseDTO'
+        '500':
+          description: Internal error (often empty body)
+  /api/v2/ai/analyze:
+    post:
+      tags: [AI v2]
+      summary: Generic structured analysis (arbitrary JSON)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StructuredAnalysisRequest'
+            examples:
+              market_structure:
+                value:
+                  analysisType: MARKET_STRUCTURE
+                  input: Analyze NQ price action from last 2 hours
+                  systemInstructions: You are a market structure expert
+                  maxTokens: 4000
+                  temperature: 0.7
+                  responseFormat: json_object
+      responses:
+        '200':
+          description: Arbitrary JSON object
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/ai/chat/sessions:
+    post:
+      tags: [AI v2]
+      summary: Create a chat session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatSessionRequest'
+            examples:
+              trade_discussion:
+                value:
+                  title: NQ Long Setup Discussion
+                  type: TRADE_DISCUSSION
+                  tradeId: 65a1b2c3d4e5f6g7h8i9j0k1
+                  symbol: NQ
+      responses:
+        '201':
+          description: Created chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/ai/chat/sessions/{sessionId}/messages:
+    post:
+      tags: [AI v2]
+      summary: Send a message in a chat session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageRequest'
+            examples:
+              question:
+                value:
+                  message: Why is this a high-confidence setup?
+      responses:
+        '200':
+          description: AI reply
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageResponse'
+        '400':
+          description: Session is not active (often empty body)
+        '404':
+          description: Not found (may be 500 depending on exception handling)
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/ai/chat/sessions/{sessionId}:
+    get:
+      tags: [AI v2]
+      summary: Get chat session by ID
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+        '404':
+          description: Not found
+
+  /api/v2/ai/chat/trades/{tradeId}/sessions:
+    get:
+      tags: [AI v2]
+      summary: List chat sessions for a trade
+      parameters:
+        - in: path
+          name: tradeId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatSession'
+
+  /api/v2/ai/chat/sessions/{sessionId}/close:
+    post:
+      tags: [AI v2]
+      summary: Close a chat session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Closed
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/ai/chat/sessions/active:
+    get:
+      tags: [AI v2]
+      summary: List active chat sessions
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatSession'
+
+  /api/v2/ai/chat/discuss-trade:
+    post:
+      tags: [AI v2]
+      summary: Create a trade discussion session (optionally send initial question)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscussTradeRequest'
+            examples:
+              start:
+                value:
+                  tradeId: 65a1b2c3d4e5f6g7h8i9j0k1
+                  initialQuestion: What are the risks with this setup?
+      responses:
+        '201':
+          description: Created chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/schedulers:
+    post:
+      tags: [Schedulers v2]
+      summary: Create a scheduler
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulerConfig'
+            examples:
+              fixed_rate:
+                value:
+                  name: custom-analysis-es
+                  description: Custom ES analysis every 10 minutes
+                  type: CUSTOM
+                  enabled: true
+                  scheduleExpression: '600000'
+                  scheduleType: FIXED_RATE
+                  parameters:
+                    symbol: ES
+                    timeframes: [5m, 15m]
+                    minConfidence: 70
+                  handlerBean: aiTradeFinderService
+                  handlerMethod: findTrades
+                  priority: 5
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerConfig'
+        '409':
+          description: Name conflict (often empty body)
+        '500':
+          description: Internal error (often empty body)
+    get:
+      tags: [Schedulers v2]
+      summary: List schedulers
+      responses:
+        '200':
+          description: Schedulers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchedulerConfig'
+
+  /api/v2/schedulers/{name}:
+    get:
+      tags: [Schedulers v2]
+      summary: Get scheduler by name
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Scheduler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerConfig'
+        '404':
+          description: Not found
+    put:
+      tags: [Schedulers v2]
+      summary: Update scheduler by name
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulerConfig'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerConfig'
+        '500':
+          description: Internal error (often empty body, includes not-found)
+    delete:
+      tags: [Schedulers v2]
+      summary: Delete scheduler by name
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+        '500':
+          description: Internal error (often empty body, includes not-found)
+
+  /api/v2/schedulers/{name}/enable:
+    post:
+      tags: [Schedulers v2]
+      summary: Enable scheduler
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated scheduler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerConfig'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/schedulers/{name}/disable:
+    post:
+      tags: [Schedulers v2]
+      summary: Disable scheduler
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated scheduler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerConfig'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v2/schedulers/statistics:
+    get:
+      tags: [Schedulers v2]
+      summary: Scheduler statistics
+      responses:
+        '200':
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerStatistics'
+
+  /api/v2/schedulers/active:
+    get:
+      tags: [Schedulers v2]
+      summary: Active schedulers
+      responses:
+        '200':
+          description: Map of schedulerName -> active
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+
+  /api/v1/trade-finder/trigger:
+    post:
+      tags: [Trade Finder v1]
+      summary: Manually trigger trade finder
+      responses:
+        '200':
+          description: Execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/trade-finder/trades/{symbol}:
+    get:
+      tags: [Trade Finder v1]
+      summary: Get trades by symbol
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IdentifiedTrade'
+
+  /api/v1/trade-finder/trades/{symbol}/status/{status}:
+    get:
+      tags: [Trade Finder v1]
+      summary: Get trades by symbol and status
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: status
+          required: true
+          schema:
+            type: string
+            description: Trade status string
+            enum: [IDENTIFIED, ALERTED, EXPIRED, CANCELLED, TAKEN, INVALIDATED]
+      responses:
+        '200':
+          description: Trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IdentifiedTrade'
+
+  /api/v1/trade-finder/trades/recent:
+    get:
+      tags: [Trade Finder v1]
+      summary: Get recent trades across all symbols
+      parameters:
+        - in: query
+          name: hours
+          required: false
+          schema:
+            type: integer
+            default: 24
+            minimum: 1
+            maximum: 168
+      responses:
+        '200':
+          description: Trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IdentifiedTrade'
+
+  /api/v1/trade-finder/statistics:
+    get:
+      tags: [Trade Finder v1]
+      summary: Get trade statistics
+      parameters:
+        - in: query
+          name: hours
+          required: false
+          schema:
+            type: integer
+            default: 24
+            minimum: 1
+            maximum: 168
+      responses:
+        '200':
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTradeStatistics'
+
+  /api/v1/trade-finder/health:
+    get:
+      tags: [Trade Finder v1]
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/market-events:
+    post:
+      tags: [Market Events v1]
+      summary: Create core market event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreMarketEvent'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreMarketEvent'
+        '500':
+          description: Internal error (often empty body)
+    get:
+      tags: [Market Events v1]
+      summary: List all market events
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CoreMarketEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/market-events/{id}:
+    get:
+      tags: [Market Events v1]
+      summary: Get market event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreMarketEvent'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+    put:
+      tags: [Market Events v1]
+      summary: Update market event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreMarketEvent'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreMarketEvent'
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+    delete:
+      tags: [Market Events v1]
+      summary: Delete market event by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/market-events/symbol/{symbol}:
+    get:
+      tags: [Market Events v1]
+      summary: Query events by symbol and time range
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CoreMarketEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/market-events/symbol/{symbol}/timeframe/{timeframe}:
+    get:
+      tags: [Market Events v1]
+      summary: Query events by symbol, timeframe, and time range
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: path
+          name: timeframe
+          required: true
+          schema: { type: string }
+        - in: query
+          name: start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: end
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CoreMarketEvent'
+        '500':
+          description: Internal error (often empty body)
+
+  /api/v1/market-events/health:
+    get:
+      tags: [Market Events v1]
+      summary: Market events health check
+      responses:
+        '200':
+          description: UP
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '503':
+          description: DOWN
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/conversations:
+    post:
+      tags: [Conversations v1]
+      summary: Create a conversation session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+            examples:
+              trade_analysis:
+                value:
+                  conversationType: TRADE_ANALYSIS
+                  symbol: NQ
+                  userId: user123
+                  expiryHours: 24
+      responses:
+        '200':
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIConversation'
+
+  /api/v1/conversations/{conversationId}:
+    get:
+      tags: [Conversations v1]
+      summary: Get conversation by ID
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIConversation'
+        '404':
+          description: Not found
+
+  /api/v1/conversations/{conversationId}/stats:
+    get:
+      tags: [Conversations v1]
+      summary: Get conversation stats
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Stats map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: Not found
+
+  /api/v1/conversations/symbol/{symbol}:
+    get:
+      tags: [Conversations v1]
+      summary: Get active conversations for a symbol
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AIConversation'
+
+  /api/v1/conversations/{conversationId}/complete:
+    post:
+      tags: [Conversations v1]
+      summary: Mark conversation completed
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/conversations/cleanup:
+    post:
+      tags: [Conversations v1]
+      summary: Cleanup expired conversations
+      responses:
+        '200':
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Response status
+          enum: [success, error, warning]
+        message:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        data:
+          nullable: true
+          description: Payload (varies by endpoint)
+        metadata:
+          nullable: true
+          description: Optional metadata (varies by endpoint)
+
+    ApiResponseTradeStatistics:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TradeStatisticsDTO'
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        requestId:
+          type: string
+          nullable: true
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    TradeStatisticsDTO:
+      type: object
+      properties:
+        periodHours: { type: integer, format: int32 }
+        totalTrades: { type: integer, format: int64 }
+        activeTrades: { type: integer, format: int64 }
+        expiredTrades: { type: integer, format: int64 }
+        alertedTrades: { type: integer, format: int64 }
+        averageConfidence: { type: number, format: double }
+        bySymbol:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+        byDirection:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+        timestamp:
+          type: string
+          format: date-time
+
+    TradeSignalResponseDTO:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [TRADE_IDENTIFIED, NO_SETUP, INSUFFICIENT_DATA, ERROR]
+        direction:
+          type: string
+          enum: [LONG, SHORT]
+        symbol: { type: string }
+        timeframe: { type: string }
+        confidence:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        entry:
+          $ref: '#/components/schemas/TradeSignalEntryInfo'
+        stop:
+          $ref: '#/components/schemas/TradeSignalStopInfo'
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeSignalTargetInfo'
+        risk_reward: { type: string, nullable: true }
+        narrative: { type: string, nullable: true }
+        trigger_conditions:
+          type: array
+          items: { type: string }
+          nullable: true
+        invalidations:
+          type: array
+          items: { type: string }
+          nullable: true
+        session_label: { type: string, nullable: true }
+        analysis_timestamp: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    TradeSignalEntryInfo:
+      type: object
+      properties:
+        zone_type:
+          type: string
+          enum: [FVG_CE, IFVG, OB, BREAKER, MITIGATION]
+        zone: { type: string, nullable: true }
+        price: { type: number, format: double, nullable: true }
+        method: { type: string, nullable: true }
+
+    TradeSignalStopInfo:
+      type: object
+      properties:
+        placement: { type: string, nullable: true }
+        price: { type: number, format: double, nullable: true }
+        reasoning: { type: string, nullable: true }
+
+    TradeSignalTargetInfo:
+      type: object
+      properties:
+        level: { type: string, nullable: true }
+        price: { type: number, format: double, nullable: true }
+        description: { type: string, nullable: true }
+
+    AnalyzeTradeRequest:
+      type: object
+      required: [symbol]
+      properties:
+        symbol: { type: string }
+        timeframe: { type: string, nullable: true }
+        marketData:
+          type: object
+          nullable: true
+          additionalProperties: true
+        indicators:
+          type: array
+          nullable: true
+          items: { type: string }
+
+    StructuredAnalysisRequest:
+      type: object
+      required: [analysisType, input]
+      properties:
+        analysisType: { type: string }
+        input: { type: string }
+        systemInstructions: { type: string, nullable: true }
+        maxTokens: { type: integer, format: int32, nullable: true }
+        temperature: { type: number, format: double, nullable: true }
+        responseFormat:
+          type: string
+          nullable: true
+          description: "Present in DTO; controller currently parses output as JSON regardless."
+
+    CreateChatSessionRequest:
+      type: object
+      properties:
+        title: { type: string, nullable: true }
+        type:
+          type: string
+          description: Recommended values TRADE_DISCUSSION, MARKET_ANALYSIS, GENERAL
+        tradeId: { type: string, nullable: true }
+        symbol: { type: string, nullable: true }
+
+    ChatMessageRequest:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    ChatMessageResponse:
+      type: object
+      properties:
+        sessionId: { type: string }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+        model: { type: string, nullable: true }
+
+    DiscussTradeRequest:
+      type: object
+      required: [tradeId]
+      properties:
+        tradeId: { type: string }
+        initialQuestion: { type: string, nullable: true }
+
+    ChatSession:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string, nullable: true }
+        type: { type: string }
+        tradeId: { type: string, nullable: true }
+        symbol: { type: string, nullable: true }
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        context: { type: string, nullable: true }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        createdBy: { type: string, nullable: true }
+
+    ChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          description: user | assistant
+        content: { type: string }
+        timestamp: { type: string, format: date-time }
+        tokens: { type: integer, format: int32, nullable: true }
+        model: { type: string, nullable: true }
+
+    SchedulerConfig:
+      type: object
+      required: [name]
+      properties:
+        id: { type: string, nullable: true }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        type:
+          type: string
+          description: TRADE_FINDER | EXPIRATION | STATISTICS | CUSTOM (stored as string)
+        enabled: { type: boolean }
+        scheduleExpression: { type: string, nullable: true }
+        scheduleType:
+          type: string
+          enum: [CRON, FIXED_RATE, FIXED_DELAY]
+        parameters:
+          type: object
+          nullable: true
+          additionalProperties: true
+        handlerBean: { type: string, nullable: true }
+        handlerMethod: { type: string, nullable: true }
+        priority: { type: integer, format: int32, nullable: true }
+        lastExecution: { type: string, format: date-time, nullable: true }
+        nextExecution: { type: string, format: date-time, nullable: true }
+        executionCount: { type: integer, format: int64, nullable: true }
+        failureCount: { type: integer, format: int64, nullable: true }
+        lastStatus: { type: string, nullable: true }
+        lastError: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        createdBy: { type: string, nullable: true }
+
+    SchedulerStatistics:
+      type: object
+      properties:
+        totalSchedulers: { type: integer, format: int32 }
+        enabledSchedulers: { type: integer, format: int32 }
+        activeSchedulers: { type: integer, format: int32 }
+        totalExecutions: { type: integer, format: int64 }
+        totalFailures: { type: integer, format: int64 }
+        schedulerNames:
+          type: object
+          additionalProperties: { type: boolean }
+
+    IdentifiedTrade:
+      type: object
+      properties:
+        id: { type: string }
+        symbol: { type: string }
+        direction:
+          type: string
+          enum: [LONG, SHORT]
+        identifiedAt: { type: string, format: date-time, nullable: true }
+        confidence: { type: integer, format: int32, nullable: true, minimum: 0, maximum: 100 }
+        status:
+          type: string
+          enum: [IDENTIFIED, ALERTED, EXPIRED, CANCELLED, TAKEN, INVALIDATED]
+        entryZoneType:
+          type: string
+          enum: [FVG_CE, IFVG, OB, BREAKER, MITIGATION]
+          nullable: true
+        entryZone: { type: string, nullable: true }
+        entryPrice: { type: number, format: double, nullable: true }
+        stopPlacement: { type: string, nullable: true }
+        targets:
+          type: array
+          items: { type: string }
+          nullable: true
+        rrHint: { type: string, nullable: true }
+        narrative: { type: string, nullable: true }
+        triggerConditions:
+          type: array
+          items: { type: string }
+          nullable: true
+        invalidations:
+          type: array
+          items: { type: string }
+          nullable: true
+        sessionLabel: { type: string, nullable: true }
+        timeframe: { type: string, nullable: true }
+        dedupeKey: { type: string, nullable: true }
+        alertSent: { type: boolean }
+        alertSentAt: { type: string, format: date-time, nullable: true }
+        alertType:
+          type: string
+          nullable: true
+          enum: [CALL_SMS_TELEGRAM, SMS_TELEGRAM, LOG_ONLY]
+        createdAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        aiRequestId: { type: string, nullable: true }
+        aiFullResponse: { type: string, nullable: true }
+        keyLevelsSnapshot: { type: string, nullable: true }
+
+    CoreMarketEvent:
+      type: object
+      properties:
+        id: { type: string, nullable: true }
+        symbol: { type: string }
+        timeframe: { type: string }
+        indicatorName: { type: string }
+        rawMessage: { type: string, nullable: true }
+        ingestedTs: { type: string, format: date-time, nullable: true }
+        meta:
+          type: object
+          nullable: true
+          additionalProperties: true
+        queued: { type: boolean }
+        transformAttempts: { type: integer, format: int32 }
+
+    CreateConversationRequest:
+      type: object
+      properties:
+        conversationType:
+          type: string
+          description: TRADE_FOLLOWUP | TRADE_ANALYSIS | MARKET_ANALYSIS | WORKFLOW (stored as string)
+        symbol: { type: string, nullable: true }
+        userId: { type: string, nullable: true }
+        expiryHours: { type: integer, format: int32, nullable: true }
+
+    AIConversation:
+      type: object
+      properties:
+        id: { type: string, nullable: true }
+        conversationId: { type: string }
+        symbol: { type: string, nullable: true }
+        conversationType: { type: string, nullable: true }
+        userId: { type: string, nullable: true }
+        tradeId: { type: string, nullable: true }
+        entityType: { type: string, nullable: true }
+        entityId: { type: string, nullable: true }
+        entitySnapshot:
+          type: object
+          nullable: true
+          additionalProperties: true
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationTurn'
+        status:
+          type: string
+          enum: [ACTIVE, COMPLETED, EXPIRED]
+        createdAt: { type: string, format: date-time, nullable: true }
+        lastActivityAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        contextData:
+          type: object
+          nullable: true
+          additionalProperties: true
+        userPreferences:
+          type: object
+          nullable: true
+          additionalProperties: true
+        tags:
+          type: array
+          items: { type: string }
+          nullable: true
+
+    ConversationTurn:
+      type: object
+      properties:
+        responseId: { type: string, nullable: true }
+        requestId: { type: string, nullable: true }
+        userInputSummary: { type: string, nullable: true }
+        aiOutputSummary: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        timestamp: { type: string, format: date-time, nullable: true }
+        tokensUsed: { type: integer, format: int32, nullable: true }
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true

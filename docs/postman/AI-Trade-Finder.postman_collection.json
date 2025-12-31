@@ -1,0 +1,522 @@
+{
+  "info": {
+    "_postman_id": "b0f1f8e6-2c74-4a6f-9f7c-2f0f4f7d9b3a",
+    "name": "AI Trade Finder",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for AI Trade Finder (v1 + v2). Set collection variable baseUrl before running."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8082" },
+    { "key": "symbol", "value": "NQ" },
+    { "key": "sessionId", "value": "" },
+    { "key": "tradeId", "value": "" },
+    { "key": "conversationId", "value": "" },
+    { "key": "schedulerName", "value": "custom-analysis-es" },
+    { "key": "marketEventId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "AI v2",
+      "item": [
+        {
+          "name": "Analyze Trade (Structured)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/analyze/trade",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "analyze", "trade"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"{{symbol}}\",\n  \"timeframe\": \"5m\",\n  \"marketData\": {\n    \"price\": 21850,\n    \"volume\": 150000\n  },\n  \"indicators\": [\"RSI\", \"MACD\", \"CISD\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "Analyze (Generic Structured JSON)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/analyze",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "analyze"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"analysisType\": \"MARKET_STRUCTURE\",\n  \"input\": \"Analyze {{symbol}} price action from last 2 hours\",\n  \"systemInstructions\": \"You are a market structure expert\",\n  \"maxTokens\": 4000,\n  \"temperature\": 0.7,\n  \"responseFormat\": \"json_object\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Chat Session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "sessions"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{symbol}} Discussion\",\n  \"type\": \"GENERAL\",\n  \"tradeId\": \"{{tradeId}}\",\n  \"symbol\": \"{{symbol}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Send Chat Message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/sessions/{{sessionId}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "sessions", "{{sessionId}}", "messages"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Why is this setup interesting?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Chat Session",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "sessions", "{{sessionId}}"]
+            }
+          }
+        },
+        {
+          "name": "List Chat Sessions For Trade",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/trades/{{tradeId}}/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "trades", "{{tradeId}}", "sessions"]
+            }
+          }
+        },
+        {
+          "name": "Close Chat Session",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/sessions/{{sessionId}}/close",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "sessions", "{{sessionId}}", "close"]
+            }
+          }
+        },
+        {
+          "name": "List Active Chat Sessions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/sessions/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "sessions", "active"]
+            }
+          }
+        },
+        {
+          "name": "Discuss Trade (Create + Optional Initial Question)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/ai/chat/discuss-trade",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ai", "chat", "discuss-trade"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tradeId\": \"{{tradeId}}\",\n  \"initialQuestion\": \"What are the risks with this setup?\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schedulers v2",
+      "item": [
+        {
+          "name": "Create Scheduler",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{schedulerName}}\",\n  \"description\": \"Custom ES analysis every 10 minutes\",\n  \"type\": \"CUSTOM\",\n  \"enabled\": true,\n  \"scheduleExpression\": \"600000\",\n  \"scheduleType\": \"FIXED_RATE\",\n  \"parameters\": {\n    \"symbol\": \"ES\",\n    \"timeframes\": [\"5m\", \"15m\"],\n    \"minConfidence\": 70\n  },\n  \"handlerBean\": \"aiTradeFinderService\",\n  \"handlerMethod\": \"findTrades\",\n  \"priority\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "List Schedulers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers"]
+            }
+          }
+        },
+        {
+          "name": "Get Scheduler By Name",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/{{schedulerName}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "{{schedulerName}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Scheduler",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/{{schedulerName}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "{{schedulerName}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"enabled\": true,\n  \"scheduleExpression\": \"300000\",\n  \"scheduleType\": \"FIXED_RATE\",\n  \"parameters\": {\n    \"symbols\": [\"{{symbol}}\"],\n    \"minConfidence\": 75\n  },\n  \"handlerBean\": \"aiTradeFinderService\",\n  \"handlerMethod\": \"findTrades\",\n  \"priority\": 10\n}"
+            }
+          }
+        },
+        {
+          "name": "Enable Scheduler",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/{{schedulerName}}/enable",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "{{schedulerName}}", "enable"]
+            }
+          }
+        },
+        {
+          "name": "Disable Scheduler",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/{{schedulerName}}/disable",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "{{schedulerName}}", "disable"]
+            }
+          }
+        },
+        {
+          "name": "Delete Scheduler",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/{{schedulerName}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "{{schedulerName}}"]
+            }
+          }
+        },
+        {
+          "name": "Scheduler Statistics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/statistics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Active Schedulers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/schedulers/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "schedulers", "active"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trade Finder v1",
+      "item": [
+        {
+          "name": "Trigger Trade Finder",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trade-finder/trigger",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trade-finder", "trigger"]
+            }
+          }
+        },
+        {
+          "name": "Get Trades By Symbol",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trade-finder/trades/{{symbol}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trade-finder", "trades", "{{symbol}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Trades By Symbol And Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trade-finder/trades/{{symbol}}/status/IDENTIFIED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trade-finder", "trades", "{{symbol}}", "status", "IDENTIFIED"]
+            }
+          }
+        },
+        {
+          "name": "Get Recent Trades (hours=24)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trade-finder/trades/recent?hours=24",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trade-finder", "trades", "recent"],
+              "query": [{ "key": "hours", "value": "24" }]
+            }
+          }
+        },
+        {
+          "name": "Trade Finder Statistics (hours=24)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trade-finder/statistics?hours=24",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trade-finder", "statistics"],
+              "query": [{ "key": "hours", "value": "24" }]
+            }
+          }
+        },
+        {
+          "name": "Trade Finder Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trade-finder/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trade-finder", "health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market Events v1",
+      "item": [
+        {
+          "name": "Create Market Event",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"{{symbol}}\",\n  \"timeframe\": \"5m\",\n  \"indicatorName\": \"RSI\",\n  \"rawMessage\": \"{\\\"value\\\": 65.3, \\\"signal\\\": \\\"neutral\\\"}\",\n  \"meta\": {\"source\": \"ui\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "List Market Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events"]
+            }
+          }
+        },
+        {
+          "name": "Get Market Event By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events/{{marketEventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events", "{{marketEventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Query Events By Symbol + Range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events/symbol/{{symbol}}?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events", "symbol", "{{symbol}}"],
+              "query": [
+                { "key": "start", "value": "2025-12-31T00:00:00Z" },
+                { "key": "end", "value": "2025-12-31T23:59:59Z" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Query Events By Symbol + Timeframe + Range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events/symbol/{{symbol}}/timeframe/5m?start=2025-12-31T00:00:00Z&end=2025-12-31T23:59:59Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events", "symbol", "{{symbol}}", "timeframe", "5m"],
+              "query": [
+                { "key": "start", "value": "2025-12-31T00:00:00Z" },
+                { "key": "end", "value": "2025-12-31T23:59:59Z" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Market Event",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events/{{marketEventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events", "{{marketEventId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"{{symbol}}\",\n  \"timeframe\": \"5m\",\n  \"indicatorName\": \"RSI\",\n  \"rawMessage\": \"{\\\"value\\\": 70.1, \\\"signal\\\": \\\"overbought\\\"}\",\n  \"meta\": {\"source\": \"ui\", \"note\": \"updated\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Market Event",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events/{{marketEventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events", "{{marketEventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Market Events Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-events/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-events", "health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conversations v1",
+      "item": [
+        {
+          "name": "Create Conversation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationType\": \"TRADE_ANALYSIS\",\n  \"symbol\": \"{{symbol}}\",\n  \"userId\": \"user123\",\n  \"expiryHours\": 24\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Conversation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{conversationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{conversationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Conversation Stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{conversationId}}", "stats"]
+            }
+          }
+        },
+        {
+          "name": "List Conversations For Symbol",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/symbol/{{symbol}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "symbol", "{{symbol}}"]
+            }
+          }
+        },
+        {
+          "name": "Complete Conversation",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "{{conversationId}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Cleanup Expired Conversations",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversations/cleanup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "conversations", "cleanup"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

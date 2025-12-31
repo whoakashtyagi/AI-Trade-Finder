@@ -1,0 +1,23 @@
+# Environment file
+.env
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Build output
+target/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
